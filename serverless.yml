@@ -1,0 +1,121 @@
+org: lucasmarcelli
+app: stonks
+service: stonks
+
+frameworkVersion: ">=1.1.0 <2.0.0"
+
+plugins:
+  - serverless-python-requirements
+
+package:
+  exclude:
+    - node_modules/**
+    - .idea/**
+    - .requirements/**
+    - env/**
+    - README.md
+    - package.json
+    - package-lock.json
+    - requirements.txt
+    - yarn.lock
+
+custom:
+  pythonRequirements:
+    dockerizePip: true
+
+provider:
+  name: aws
+  runtime: python3.8
+  region: ca-central-1
+  environment: 
+    STAGE: ${self:provider.stage}
+  apiKeys:
+    - key
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+        - dynamodb:DescribeTable
+      Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/*"
+
+
+functions:
+  handle-event-stream:
+    handler: stonks/eventstream.handler
+    events:
+      - stream: arn:aws:dynamodb:ca-central-1:914050192047:table/dev-stonks-events/stream/2020-04-27T00:43:41.293
+  create-trade:
+    handler: stonks/commands/trades.create
+    events:
+      - http:
+          path: stonks/trades
+          method: post
+          cors: true
+          private: true
+
+  list-trades:
+    handler: stonks/queries/trades.list
+    events:
+      - http:
+          path: stonks/trades
+          method: get
+          cors: true
+          private: true
+          integration: lambda
+
+  get-trade:
+    handler: stonks/queries/trades.get
+    events:
+      - http:
+          path: stonks/trades/{eventId}
+          method: get
+          integration: lambda
+          cors: true
+          private: true
+          request:
+            parameters:
+              paths:
+                eventId: true
+
+resources:
+  Resources:
+    StonkEventsTable:
+      Type: 'AWS::DynamoDB::Table'
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: eventId
+            AttributeType: S
+        KeySchema:
+          -
+            AttributeName: eventId
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:provider.stage}-stonks-events
+    StonkConsumerTable:
+      Type: 'AWS::DynamoDB::Table'
+      DeletionPolicy: Delete
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: consumerId
+            AttributeType: S
+        KeySchema:
+          -
+            AttributeName: consumerId
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:provider.stage}-stonks-consumer
+    
+
+
