@@ -7,7 +7,7 @@ from pynamodb.models import Model
 # The base event model.
 class Event(Model):
     class Meta:
-        table_name = os.environ['STAGE'] + '-stonks-events'
+        table_name = os.environ['STAGE'] + '-stonks-event'
         region = 'ca-central-1'
         host = 'https://dynamodb.ca-central-1.amazonaws.com'
     

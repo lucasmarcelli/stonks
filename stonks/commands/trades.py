@@ -13,7 +13,11 @@ def create(event, context):
     units = int(data['units'])  
     commission = int(data['commission']) if 'commission' in data else 99900
     action = data['action']
-    averagePrice = units * int(data['tradePrice']) + commission if action == ActionEnum.BUY else -1 * commission
+    averagePrice = units * int(data['tradePrice'])
+    if(action == ActionEnum.BUY):
+        averagePrice += commission
+    else:
+        averagePrice -= commission
     averagePrice = int(averagePrice / units)
     trade = Trade(
         commission=commission, 

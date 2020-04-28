@@ -20,6 +20,14 @@ class Consumer(Model):
     # ULID of the last event that the consumer hard reconciled to
     reconciledTo = UnicodeAttribute(default="fresh")
 
+    @classmethod
+    def consume(cls, event, consumer):
+        consumer.update(
+            actions=[
+                cls.version.set(event['eventId'])
+            ]
+        )
+
     def __iter__(self):
         for name, attr in self._get_attributes().items():
             yield name, attr.serialize(getattr(self, name))

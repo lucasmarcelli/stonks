@@ -47,8 +47,38 @@ provider:
 functions:
   handle-event-stream:
     handler: stonks/eventstream.handler
+    reservedConcurrency: 10
     events:
-      - stream: arn:aws:dynamodb:ca-central-1:914050192047:table/dev-stonks-events/stream/2020-04-27T00:43:41.293
+      - stream: arn:aws:dynamodb:ca-central-1:914050192047:table/dev-stonks-event/stream/2020-04-27T17:14:38.503
+
+  get-event:
+    handler: stonks/queries/event.get
+    events:
+      - http:
+          path: stonks/events/{eventId}
+          method: get
+          integration: lambda
+          cors: true
+          private: true
+          request:
+            parameters:
+              paths:
+                eventId: true
+
+  get-consumer:
+    handler: stonks/queries/consumer.get
+    events:
+      - http:
+          path: stonks/consumers/{consumerId}
+          method: get
+          integration: lambda
+          cors: true
+          private: true
+          request:
+            parameters:
+              paths:
+                consumerId: true
+
   create-trade:
     handler: stonks/commands/trades.create
     events:
@@ -82,11 +112,49 @@ functions:
               paths:
                 eventId: true
 
+  get-holding:
+    handler: stonks/queries/holdings.get
+    events:
+      - http:
+          path: stonks/holdings/{consumerId}
+          method: get
+          integration: lambda
+          cors: true
+          private: true
+          request:
+            parameters:
+              paths:
+                consumerId: true
+
+  get-holding-by-symbol:
+    handler: stonks/queries/holdings.getBySymbol
+    events:
+      - http:
+          path: stonks/holdings
+          method: get
+          integration: lambda
+          cors: true
+          private: true
+          request:
+            parameters:
+              querystrings:
+                symbol: true
+    
+  list-holdings:
+    handler: stonks/queries/holdings.list
+    events:
+      - http:
+          path: stonks/holdings
+          method: get
+          cors: true
+          private: true
+          integration: lambda
+
 resources:
   Resources:
     StonkEventsTable:
       Type: 'AWS::DynamoDB::Table'
-      DeletionPolicy: Retain
+      DeletionPolicy: Delete
       Properties:
         AttributeDefinitions:
           -
@@ -97,9 +165,9 @@ resources:
             AttributeName: eventId
             KeyType: HASH
         ProvisionedThroughput:
-          ReadCapacityUnits: 1
-          WriteCapacityUnits: 1
-        TableName: ${self:provider.stage}-stonks-events
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+        TableName: ${self:provider.stage}-stonks-event
     StonkConsumerTable:
       Type: 'AWS::DynamoDB::Table'
       DeletionPolicy: Delete
@@ -113,8 +181,8 @@ resources:
             AttributeName: consumerId
             KeyType: HASH
         ProvisionedThroughput:
-          ReadCapacityUnits: 1
-          WriteCapacityUnits: 1
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
         TableName: ${self:provider.stage}-stonks-consumer
     
 
