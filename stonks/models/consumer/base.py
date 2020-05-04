@@ -7,26 +7,17 @@ from pynamodb.models import Model
 # Consumers are only ever modified by events, queries only read them.
 class Consumer(Model):
     class Meta:
-        table_name = os.environ['STAGE'] + '-stonks-consumer'
         region = 'ca-central-1'
         host = 'https://dynamodb.ca-central-1.amazonaws.com'
     
-    consumerId = UnicodeAttribute(hash_key=True, default=str(ulid.new()))
-    updatedAt = UTCDateTimeAttribute(null=False)
-    createdAt = UTCDateTimeAttribute(default=datetime.now())
+    # A range key for sorting all consumers
+    updatedAt = UTCDateTimeAttribute(range_key=True)
+    createdAt = UTCDateTimeAttribute(default_for_new=datetime.now())
 
     # ULID of the last event that modified the consumer from the stream or a soft reconcile
-    version = UnicodeAttribute(default="fresh")
+    version = UnicodeAttribute(default_for_new="fresh")
     # ULID of the last event that the consumer hard reconciled to
-    reconciledTo = UnicodeAttribute(default="fresh")
-
-    @classmethod
-    def consume(cls, event, consumer):
-        consumer.update(
-            actions=[
-                cls.version.set(event['eventId'])
-            ]
-        )
+    reconciledTo = UnicodeAttribute(default_for_new="fresh")
 
     def __iter__(self):
         for name, attr in self._get_attributes().items():

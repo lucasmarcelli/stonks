@@ -15,3 +15,4 @@ class Trade(Event):
     averagePrice = NumberAttribute()
     commission = NumberAttribute()
     eventType = NumberAttribute(default=EventTypeEnum.TRADE)
+

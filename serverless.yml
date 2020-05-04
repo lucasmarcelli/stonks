@@ -6,7 +6,6 @@ frameworkVersion: ">=1.1.0 <2.0.0"
 
 plugins:
   - serverless-python-requirements
-
 package:
   exclude:
     - node_modules/**
@@ -20,6 +19,13 @@ package:
     - yarn.lock
 
 custom:
+  dynamodb:
+    stages: 
+      - dev
+        prod
+    start:
+      migrate: true
+    
   pythonRequirements:
     dockerizePip: true
 
@@ -27,6 +33,7 @@ provider:
   name: aws
   runtime: python3.8
   region: ca-central-1
+  stage: ${opt:stage, 'dev'}
   environment: 
     STAGE: ${self:provider.stage}
   apiKeys:
@@ -45,11 +52,17 @@ provider:
 
 
 functions:
-  handle-event-stream:
-    handler: stonks/eventstream.handler
-    reservedConcurrency: 10
-    events:
-      - stream: arn:aws:dynamodb:ca-central-1:914050192047:table/dev-stonks-event/stream/2020-04-27T17:14:38.503
+  # handle-event-stream:
+    # handler: stonks/eventstream.handler
+    # reservedConcurrency: 10
+    # events:
+    #   - stream: arn:aws:dynamodb:ca-central-1:914050192047:table/dev-stonks-event/stream/2020-04-28T18:11:12.326
+  
+  # handle-event-stream:
+  #   handler: stonks/eventstream.handler
+  #   reservedConcurrency: 10
+  #   events:
+  #     - stream: arn:aws:dynamodb:ca-central-1:914050192047:table/prod-stonks-event/stream/2020-04-29T17:07:29.603
 
   get-event:
     handler: stonks/queries/event.get
@@ -65,19 +78,14 @@ functions:
               paths:
                 eventId: true
 
-  get-consumer:
-    handler: stonks/queries/consumer.get
+  create-bank-transaction:
+    handler: stonks/commands/bank.create
     events:
       - http:
-          path: stonks/consumers/{consumerId}
-          method: get
-          integration: lambda
+          path: stonks/banktransaction
+          method: post
           cors: true
           private: true
-          request:
-            parameters:
-              paths:
-                consumerId: true
 
   create-trade:
     handler: stonks/commands/trades.create
@@ -125,6 +133,16 @@ functions:
             parameters:
               paths:
                 consumerId: true
+  
+  get-all-accounts:
+    handler: stonks/queries/accounts.getAll
+    events:
+      - http:
+          path: stonks/accounts
+          method: get
+          cors: true
+          private: true
+          integration: lambda
 
   get-holding-by-symbol:
     handler: stonks/queries/holdings.getBySymbol
@@ -149,7 +167,7 @@ functions:
           cors: true
           private: true
           integration: lambda
-
+          
 resources:
   Resources:
     StonkEventsTable:
@@ -157,33 +175,79 @@ resources:
       DeletionPolicy: Delete
       Properties:
         AttributeDefinitions:
-          -
-            AttributeName: eventId
+          - AttributeName: eventId
+            AttributeType: S
+          - AttributeName: eventDateTime
             AttributeType: S
         KeySchema:
-          -
-            AttributeName: eventId
+          - AttributeName: eventId
             KeyType: HASH
+          - AttributeName: eventDateTime
+            KeyType: RANGE
         ProvisionedThroughput:
-          ReadCapacityUnits: 5
-          WriteCapacityUnits: 5
+          ReadCapacityUnits: '5'
+          WriteCapacityUnits: '5'
         TableName: ${self:provider.stage}-stonks-event
-    StonkConsumerTable:
+    StonkHoldingTable:
       Type: 'AWS::DynamoDB::Table'
       DeletionPolicy: Delete
       Properties:
         AttributeDefinitions:
-          -
-            AttributeName: consumerId
+          - AttributeName: holdingId
+            AttributeType: S
+          - AttributeName: updatedAt
+            AttributeType: S
+          - AttributeName: symbol
             AttributeType: S
         KeySchema:
-          -
-            AttributeName: consumerId
+          - AttributeName: holdingId
             KeyType: HASH
+          - AttributeName: updatedAt
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: SymbolIndex
+            KeySchema:
+            - AttributeName: symbol
+              KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: '5'
+              WriteCapacityUnits: '5'
         ProvisionedThroughput:
-          ReadCapacityUnits: 5
-          WriteCapacityUnits: 5
-        TableName: ${self:provider.stage}-stonks-consumer
+          ReadCapacityUnits: '5'
+          WriteCapacityUnits: '5'
+        TableName: ${self:provider.stage}-stonks-holding
+    StonkAccountsTable:
+      Type: 'AWS::DynamoDB::Table'
+      DeletionPolicy: Delete
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: accountId
+            AttributeType: S
+          - AttributeName: updatedAt
+            AttributeType: S
+          - AttributeName: name
+            AttributeType: S
+        KeySchema:
+          - AttributeName: accountId
+            KeyType: HASH
+          - AttributeName: updatedAt
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: NameIndex
+            KeySchema:
+            - AttributeName: name
+              KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: '5'
+              WriteCapacityUnits: '5'
+        ProvisionedThroughput:
+          ReadCapacityUnits: '5'
+          WriteCapacityUnits: '5'
+        TableName: ${self:provider.stage}-stonks-accounts
     
 
 

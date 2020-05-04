@@ -1,16 +1,15 @@
 import json
 from pynamodb.exceptions import DoesNotExist
-from stonks.models.consumer.base import Consumer
+from stonks.models.consumer.account import Account
 
-
-def get(event, context):
+def getAll(event, context):
     try:
-        consumer = Consumer.get(hash_key=event['path']['consumerId'])
+        accounts = Account.scan(consistent_read=True)
     except DoesNotExist:
         return {'statusCode': 404,
                 'body': json.dumps({'error_message': 'not found'})}
     except:
         return {'statusCode': 500,
-                'body': json.dumps(event)}
+                'body': json.dumps(accounts)}
 
-    return {'event': dict(consumer)}
+    return {'accounts': [dict(result) for result in accounts]}

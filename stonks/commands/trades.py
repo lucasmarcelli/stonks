@@ -20,6 +20,7 @@ def create(event, context):
         averagePrice -= commission
     averagePrice = int(averagePrice / units)
     trade = Trade(
+        eventDateTime=data['eventDateTime'],
         commission=commission, 
         units=data['units'], 
         action=action,
@@ -30,7 +31,7 @@ def create(event, context):
     )
     trade.save()
     return {
-        'statusCode': 200,
+        'statusCode': '200',
         'body': json.dumps(dict(trade))
     }
 

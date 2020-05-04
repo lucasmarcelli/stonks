@@ -1,33 +1,43 @@
 import ulid
+import os
 from .base import Consumer
 from stonks.enums import EventTypeEnum, ActionEnum
-from pynamodb.indexes import LocalSecondaryIndex, AllProjection
+from pynamodb.indexes import GlobalSecondaryIndex, AllProjection
 from pynamodb.attributes import UnicodeAttribute, NumberAttribute, UTCDateTimeAttribute
 
-class HoldingIndex(LocalSecondaryIndex):
+
+class SymbolIndex(GlobalSecondaryIndex):
     class Meta:
         projection = AllProjection()
-    consumerId = UnicodeAttribute(hash_key=True)
-    symbol = UnicodeAttribute(range_key=True)
+    
+    symbol = UnicodeAttribute(hash_key=True)
 
 class Holding(Consumer):
     class Meta(Consumer.Meta):
-        pass
+        table_name = os.environ['STAGE'] + '-stonks-holding'
+    
+    holdingId = UnicodeAttribute(hash_key=True, default_for_new=str(ulid.new()))
+    symbol = UnicodeAttribute(default="fresh")
+    symbolIndex = SymbolIndex()
+    units = NumberAttribute(default=0)
+    averagePrice = NumberAttribute(default=0)
+    latestTradePrice = NumberAttribute(default=0)
+    bookCost = NumberAttribute(default=0)
 
     # Consumes the event
     @classmethod
     def consume(cls, event, consumer=None):
         if(consumer == None):
             symbol = event['symbol']
-            results = cls.scan(cls.symbol==symbol, consistent_read=True)
+            results = cls.symbolIndex.query(symbol)
             results = [result for result in results]
             if(len(results) == 0):
-                consumer = cls(symbol=symbol, consumerId=str(ulid.new()))
+                consumer = cls(symbol=symbol, holdingId=str(ulid.new()))
                 consumer.save()
             else:
                 consumer = results[0]
 
-        consumer.refresh()
+        consumer.refresh(consistent_read=True)
         
         # Bit of business logic
         action = event['action']
@@ -36,7 +46,6 @@ class Holding(Consumer):
         holdingBookCost = int(consumer.averagePrice) * int(consumer.units)
         eventAveragePrice = int(event['averagePrice'])
         eventTotalCost = eventAveragePrice * units
-
 
         if(action == ActionEnum.BUY):
             units += int(consumer.units)             
@@ -55,17 +64,10 @@ class Holding(Consumer):
                 cls.units.set(units),
                 cls.averagePrice.set(averagePrice),
                 cls.bookCost.set(holdingBookCost),
-                cls.latestTradePrice.set(tradePrice)
+                cls.latestTradePrice.set(tradePrice),
+                cls.version.set(event['eventId'])
             ]
         )
-
-        super(Holding, cls).consume(event=event, consumer=consumer)
-    
-    symbol = UnicodeAttribute(default="fresh")
-    units = NumberAttribute(default=0)
-    averagePrice = NumberAttribute(default=0)
-    latestTradePrice = NumberAttribute(default=0)
-    bookCost = NumberAttribute(default=0)
 
 
 class Stock(Holding):
@@ -76,3 +78,4 @@ class Stock(Holding):
 class MutualFund(Holding):
     class Meta(Holding.Meta):
         pass
+

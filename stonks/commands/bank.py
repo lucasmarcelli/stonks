@@ -10,13 +10,18 @@ def create(event, context):
     data = json.loads(event['body'])    
     if 'value' not in data:
         return {
-            'statusCode': 400,
+            'statusCode': '400',
             'message': 'send value bruh'
         }
-    transaction = BankTransaction(value=data['value'])
+    transaction = BankTransaction(
+        value=int(data['value']),
+        accountName=data['accountName'],
+        eventDateTime=data['eventDateTime']
+    )
+
     transaction.save()
     return {
-        'statusCode': 200,
+        'statusCode': '200',
         'body': json.dumps(dict(transaction))
     }
 

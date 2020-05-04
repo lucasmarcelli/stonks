@@ -8,6 +8,7 @@ class BankTransaction(Event):
 
     value = NumberAttribute()
     eventType = NumberAttribute(default=EventTypeEnum.BANK)
+    accountName = UnicodeAttribute()
     
 
     
